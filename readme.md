@@ -54,14 +54,22 @@ Dependencies (Debian/Ubuntu):
 
 ```bash
 sudo apt-get update
-sudo dpkg --add-architecture i386
-sudo apt-get install -y cmake ninja-build g++-multilib libbullet-dev:i386
+sudo apt-get install -y cmake ninja-build g++-multilib git
 ```
 
 Build:
 
 ```bash
-cmake -S . -B build -G Ninja -DFORCE_32_BIT=ON -DCMAKE_BUILD_TYPE=Release
+git clone --depth 1 https://github.com/bulletphysics/bullet3 deps/bullet3
+cmake -S deps/bullet3 -B deps/bullet3-build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$PWD/deps/bullet3-install" \
+  -DCMAKE_C_FLAGS="-m32" -DCMAKE_CXX_FLAGS="-m32" -DCMAKE_SHARED_LINKER_FLAGS="-m32" \
+  -DBUILD_SHARED_LIBS=ON -DBUILD_BULLET2_DEMOS=OFF -DBUILD_CPU_DEMOS=OFF -DBUILD_EXTRAS=OFF -DBUILD_OPENGL3_DEMOS=OFF -DBUILD_UNIT_TESTS=OFF
+cmake --build deps/bullet3-build --target install --parallel
+
+cmake -S . -B build -G Ninja -DFORCE_32_BIT=ON -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH="$PWD/deps/bullet3-install"
 cmake --build build --parallel
 ```
 

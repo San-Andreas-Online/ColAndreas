@@ -35,10 +35,43 @@ jobs:
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++-multilib libbullet-dev:i386
-          test -f /usr/lib/i386-linux-gnu/libBulletCollision.so
+          sudo apt-get install -y cmake ninja-build g++-multilib git
+
+      - name: Build Bullet for Linux x86
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/bulletphysics/bullet3 deps/bullet3
+
+          cmake -S deps/bullet3 -B deps/bullet3-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/deps/bullet3-install" \
+            -DCMAKE_C_FLAGS="-m32" \
+            -DCMAKE_CXX_FLAGS="-m32" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-m32" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBUILD_BULLET2_DEMOS=OFF \
+            -DBUILD_CPU_DEMOS=OFF \
+            -DBUILD_EXTRAS=OFF \
+            -DBUILD_OPENGL3_DEMOS=OFF \
+            -DBUILD_UNIT_TESTS=OFF
+          cmake --build deps/bullet3-build --target install --parallel
+
+          bullet_config_dir="$(find "${GITHUB_WORKSPACE}/deps/bullet3-install" -type f -name BulletConfig.cmake -printf '%h\n' | head -n 1)"
+          if [[ -z "${bullet_config_dir}" ]]; then
+            echo "Could not locate BulletConfig.cmake in deps/bullet3-install"
+            exit 1
+          fi
+          echo "BULLET_CONFIG_DIR=${bullet_config_dir}" >> "${GITHUB_ENV}"
+
+          bullet_collision_so="$(find "${GITHUB_WORKSPACE}/deps/bullet3-install" -type f -name 'libBulletCollision.so*' | head -n 1)"
+          if [[ -z "${bullet_collision_so}" ]]; then
+            echo "Could not locate libBulletCollision shared library in deps/bullet3-install"
+            exit 1
+          fi
+          file "${bullet_collision_so}" | grep -q 'ELF 32-bit'
 
       - name: Install Bullet for Windows (x86 static)
         if: runner.os == 'Windows'
@@ -60,11 +93,13 @@ jobs:
 
       - name: Configure (Linux)
         if: runner.os == 'Linux'
-        run: >
-          cmake -S . -B build -G Ninja
-          -DFORCE_32_BIT=ON
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-          -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DFORCE_32_BIT=ON \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/deps/bullet3-install" \
+            -DBullet_DIR="${BULLET_CONFIG_DIR}"
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
