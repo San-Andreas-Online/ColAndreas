@@ -3,6 +3,7 @@
 // Initialize ColAndreas
 ColAndreasWorld::ColAndreasWorld()
 {
+	mapWaterMesh = NULL;
 	broadphase = new btDbvtBroadphase();
 	collisionConfiguration = new btDefaultCollisionConfiguration();
 	dispatcher = new btCollisionDispatcher(collisionConfiguration);

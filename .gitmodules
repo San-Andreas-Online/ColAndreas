@@ -1,0 +1,3 @@
+[submodule "libs/omp-sdk"]
+	path = libs/omp-sdk
+	url = https://github.com/Knogle/open.mp-sdk

@@ -22,7 +22,6 @@ typedef unsigned long DWORD;
 // AMX
 typedef void(*logprintf_t)(char* format, ...);
 #include "SDK/amx/amx.h"
-#include "SDK/plugincommon.h"
 
 // Standard includes
 #include <vector>
