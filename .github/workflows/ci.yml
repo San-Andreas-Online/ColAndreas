@@ -1,0 +1,102 @@
+name: Build and Release
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Linux Build + Native Exposure Check
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libbullet-dev
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DFORCE_32_BIT=OFF
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Verify exposed natives
+        run: bash scripts/ci/check-native-exposure.sh
+
+      - name: Locate built component
+        id: locate_component
+        shell: bash
+        run: |
+          set -euo pipefail
+          component_path="$(find build -maxdepth 2 -type f \( -name 'ColAndreas.so' -o -name 'ColAndreas_static.so' \) | head -n 1)"
+          if [[ -z "${component_path}" ]]; then
+            echo "Could not find ColAndreas shared library in build output."
+            exit 1
+          fi
+          echo "component_path=${component_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Stage build artifacts
+        run: |
+          mkdir -p dist/linux/components dist/linux/pawno/include
+          cp "${{ steps.locate_component.outputs.component_path }}" dist/linux/components/
+          cp Server/include/colandreas.inc dist/linux/pawno/include/colandreas.inc
+
+      - name: Upload Linux build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-linux
+          path: |
+            dist/linux/components/*
+            dist/linux/pawno/include/colandreas.inc
+          if-no-files-found: error
+
+      - name: Package Linux release archive
+        if: github.event_name == 'release'
+        run: |
+          mkdir -p release/ColAndreas
+          cp -r dist/linux/components release/ColAndreas/components
+          cp -r dist/linux/pawno release/ColAndreas/pawno
+          tar -C release -czf dist/ColAndreas-linux.tar.gz ColAndreas
+
+      - name: Upload release package artifact
+        if: github.event_name == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist/ColAndreas-linux.tar.gz
+          if-no-files-found: error
+
+  upload-release-assets:
+    name: Upload release assets
+    if: github.event_name == 'release'
+    runs-on: ubuntu-22.04
+    needs: build-linux
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-linux
+          path: release-assets
+
+      - name: Upload assets to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          fail_on_unmatched_files: true

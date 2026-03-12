@@ -1,33 +1,100 @@
-# ColAndreas
+# ColAndreas Component for open.mp
 
-[New thread](https://www.burgershot.gg/showthread.php?tid=175), since the previous thread was deleted by your king. 
+[![Build and Release](https://github.com/Knogle/ColAndreas/actions/workflows/ci.yml/badge.svg)](https://github.com/Knogle/ColAndreas/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/Knogle/ColAndreas?display_name=tag)](https://github.com/Knogle/ColAndreas/releases)
+[![Total Downloads](https://img.shields.io/github/downloads/Knogle/ColAndreas/total.svg)](https://github.com/Knogle/ColAndreas/releases)
+[![Latest Release Downloads](https://img.shields.io/github/downloads/Knogle/ColAndreas/latest/total.svg)](https://github.com/Knogle/ColAndreas/releases)
 
-ColAndreas is an open.mp component which creates a simulation of the San Andreas world. Using the [Bullet Physics library](http://bulletphysics.org/), ColAndreas
-gives the server knowledge of the game environment itself.
+ColAndreas is an open.mp component that provides server-side collision and world queries for San Andreas using the Bullet Physics library.
 
-**Watch it in action:** [https://www.youtube.com/watch?v=aSabQWqQBkI](https://www.youtube.com/watch?v=aSabQWqQBkI)
+Current version: **v1.5.0**
 
-## Download
+Current maintainer: **[Knogle](https://github.com/Knogle)**
 
-Go to the [releases page](https://github.com/Pottus/ColAndreas/releases) and grab the latest *ColAndreas_Precompiled* zip file, it contains the Windows and Linux versions of the plugin, the include file for PAWN and the Wizard executable. The wizard generated file goes in /scriptfiles/ColAndreas/ with the name of ColAndreas.cadb!
+## Highlights
 
-## Linux note
+- open.mp component build (`ColAndreas.so` on Linux).
+- Native API for ray casts, contact tests, object collision management and utility conversions.
+- Include file and component shipped together for straightforward deployment.
+- CI with Linux build and native API exposure verification.
 
-* If you get this error: `Failed (libBulletCollision.so.2.82: cannot open shared object file: No such file or directory)` it means your system doesn't have the required libraries. There are 2 possible solutions for this issue:
-	* Use the statically linked version of the plugin (*ColAndreas_static.so*).
-	* Install the Bullet libraries using your distro's package manager.
-		* **Ubuntu:** `sudo apt-get install libbulletcollision2.82:i386 libbulletdynamics2.82:i386 liblinearmath2.82:i386 libbulletsoftbody2.82:i386`
-		* Please note that you must install the *32bit* (i386) version of the libraries, even if you use a 64bit OS.
+## Download and Installation
 
-## open.mp usage
+1. Download the latest archive from the [Releases page](https://github.com/Knogle/ColAndreas/releases).
+2. Extract the release into your open.mp server root while keeping folder structure.
+3. Ensure at least these files are placed correctly:
+   - `components/ColAndreas.so` (Linux)
+   - `pawno/include/colandreas.inc`
+4. Place the collision database file as `scriptfiles/ColAndreas/ColAndreas.cadb`.
+5. Make sure your server configuration loads the component.
 
-Build output is a component (`ColAndreas.so` on Linux, `ColAndreas.dll` on Windows). Put it in your server `components/` directory and load it from `server.cfg`.
+## Linux Runtime Note
 
-## build instructions under debian
-sudo apt-get install libbullet-dev
-sudo apt-get install cmake
-cd ColAndreas-master
+If you get a missing Bullet shared library error at runtime, your host is missing required Bullet runtime libraries.
+
+You can either:
+
+- Use a static build (`ColAndreas_static.so`) when available, or
+- Install Bullet runtime packages from your distribution.
+
+## Build from Source
+
+### Repository Setup
+
+```bash
+git clone https://github.com/Knogle/ColAndreas.git
+cd ColAndreas
 git submodule update --init --recursive
-cmake -B build
-cd build
-make
+```
+
+### Linux (CMake)
+
+Dependencies (Debian/Ubuntu):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y cmake ninja-build g++ libbullet-dev
+```
+
+Build:
+
+```bash
+cmake -S . -B build -G Ninja -DFORCE_32_BIT=OFF -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+Output:
+
+- `build/ColAndreas.so` (or `build/ColAndreas_static.so` if linked against static Bullet libraries)
+
+## CI/CD
+
+Workflow file: `.github/workflows/ci.yml`
+
+Triggers:
+
+- `push`
+- `pull_request`
+- `release` (`published`)
+- `workflow_dispatch`
+
+CI checks:
+
+- Configure and build ColAndreas on Ubuntu 22.04.
+- Validate that natives declared in `Server/include/colandreas.inc` match natives registered in `src/ColAndreas.cpp`.
+
+Release behavior:
+
+- Build Linux artifact.
+- Package `ColAndreas-linux.tar.gz`.
+- Upload release package asset automatically to the GitHub release.
+
+## Compatibility
+
+- Runtime target: open.mp servers
+- SDK: open.mp SDK (`libs/omp-sdk` submodule)
+- Physics engine: Bullet
+
+## Credits
+
+Original project and foundation by **[uL]Pottus**, **[uL]Chris42O** and **[uL]Slice**.
