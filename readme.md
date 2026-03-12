@@ -13,10 +13,10 @@ Current maintainer: **[Knogle](https://github.com/Knogle)**
 
 ## Highlights
 
-- open.mp component build (`ColAndreas.so` on Linux).
+- open.mp component builds for Linux and Windows (`ColAndreas.so` / `ColAndreas.dll`).
 - Native API for ray casts, contact tests, object collision management and utility conversions.
 - Include file and component shipped together for straightforward deployment.
-- CI with Linux build and native API exposure verification.
+- CI with 32-bit Linux and Windows builds plus native API exposure verification.
 
 ## Download and Installation
 
@@ -24,6 +24,7 @@ Current maintainer: **[Knogle](https://github.com/Knogle)**
 2. Extract the release into your open.mp server root while keeping folder structure.
 3. Ensure at least these files are placed correctly:
    - `components/ColAndreas.so` (Linux)
+   - `components/ColAndreas.dll` (Windows)
    - `pawno/include/colandreas.inc`
 4. Place the collision database file as `scriptfiles/ColAndreas/ColAndreas.cadb`.
 5. Make sure your server configuration loads the component.
@@ -47,19 +48,20 @@ cd ColAndreas
 git submodule update --init --recursive
 ```
 
-### Linux (CMake)
+### Linux x86 (CMake)
 
 Dependencies (Debian/Ubuntu):
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y cmake ninja-build g++ libbullet-dev
+sudo dpkg --add-architecture i386
+sudo apt-get install -y cmake ninja-build g++-multilib libbullet-dev:i386
 ```
 
 Build:
 
 ```bash
-cmake -S . -B build -G Ninja -DFORCE_32_BIT=OFF -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -G Ninja -DFORCE_32_BIT=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
@@ -80,13 +82,13 @@ Triggers:
 
 CI checks:
 
-- Configure and build ColAndreas on Ubuntu 22.04.
+- Configure and build ColAndreas as 32-bit on Linux (Ubuntu 24.04) and Windows (Win32).
 - Validate that natives declared in `Server/include/colandreas.inc` match natives registered in `src/ColAndreas.cpp`.
 
 Release behavior:
 
-- Build Linux artifact.
-- Package `ColAndreas-linux.tar.gz`.
+- Build Linux and Windows artifacts.
+- Package `ColAndreas-linux.tar.gz` and `ColAndreas-windows.zip`.
 - Upload release package asset automatically to the GitHub release.
 
 ## Compatibility

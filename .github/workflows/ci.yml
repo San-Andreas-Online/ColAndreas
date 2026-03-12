@@ -8,11 +8,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-linux:
-    name: Linux Build + Native Exposure Check
-    runs-on: ubuntu-22.04
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            name: Linux (x86)
+            os: ubuntu-24.04
+            release_glob: dist/ColAndreas-linux.tar.gz
+          - id: windows
+            name: Windows (Win32)
+            os: windows-2022
+            release_glob: dist/ColAndreas-windows.zip
 
     steps:
       - name: Checkout
@@ -20,25 +32,66 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install dependencies
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
         run: |
+          sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++ libbullet-dev
+          sudo apt-get install -y cmake ninja-build g++-multilib libbullet-dev:i386
+          test -f /usr/lib/i386-linux-gnu/libBulletCollision.so
 
-      - name: Configure
+      - name: Install Bullet for Windows (x86 static)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $VcpkgRoot = "$env:RUNNER_TEMP\vcpkg"
+          git clone --depth 1 https://github.com/microsoft/vcpkg $VcpkgRoot
+          & "$VcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+          & "$VcpkgRoot\vcpkg.exe" install bullet3:x86-windows-static
+
+          $TripletRoot = "$VcpkgRoot\installed\x86-windows-static"
+          if (!(Test-Path "$TripletRoot\include\bullet\btBulletDynamicsCommon.h")) { throw "Missing Bullet headers in $TripletRoot" }
+          if (!(Test-Path "$TripletRoot\lib\BulletCollision.lib")) { throw "Missing Bullet import/static lib in $TripletRoot\lib" }
+
+          $Toolchain = "$VcpkgRoot\scripts\buildsystems\vcpkg.cmake" -replace '\\','/'
+          $TripletRoot = $TripletRoot -replace '\\','/'
+          "VCPKG_TOOLCHAIN_FILE=$Toolchain" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VCPKG_INSTALLED_DIR=$TripletRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
         run: >
           cmake -S . -B build -G Ninja
-          -DFORCE_32_BIT=OFF
+          -DFORCE_32_BIT=ON
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A Win32 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_TOOLCHAIN_FILE" `
+            -DVCPKG_TARGET_TRIPLET=x86-windows-static `
+            -DBULLET_ROOT="$env:VCPKG_INSTALLED_DIR" `
+            -DCMAKE_PREFIX_PATH="$env:VCPKG_INSTALLED_DIR"
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
         run: cmake --build build --parallel
 
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build build --config Release --parallel
+
       - name: Verify exposed natives
+        if: runner.os == 'Linux'
         run: bash scripts/ci/check-native-exposure.sh
 
-      - name: Locate built component
-        id: locate_component
+      - name: Locate Linux component and verify x86 binary
+        if: runner.os == 'Linux'
+        id: locate_linux_component
         shell: bash
         run: |
           set -euo pipefail
@@ -47,44 +100,116 @@ jobs:
             echo "Could not find ColAndreas shared library in build output."
             exit 1
           fi
-          echo "component_path=${component_path}" >> "$GITHUB_OUTPUT"
+          if ! file "${component_path}" | grep -q 'ELF 32-bit'; then
+            echo "Expected a 32-bit ELF binary, got:"
+            file "${component_path}"
+            exit 1
+          fi
+          echo "component_path=${component_path}" >> "${GITHUB_OUTPUT}"
 
-      - name: Stage build artifacts
+      - name: Locate Windows component and verify x86 binary
+        if: runner.os == 'Windows'
+        id: locate_windows_component
+        shell: pwsh
+        run: |
+          $component = Get-ChildItem -Path build -Recurse -Filter ColAndreas.dll | Select-Object -First 1
+          if (-not $component) { throw "Could not find ColAndreas.dll in build output." }
+
+          $bytes = [System.IO.File]::ReadAllBytes($component.FullName)
+          if ($bytes.Length -lt 64 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw "Invalid DOS header in $($component.FullName)" }
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          if ($peOffset + 24 -ge $bytes.Length) { throw "Invalid PE offset in $($component.FullName)" }
+          if ($bytes[$peOffset] -ne 0x50 -or $bytes[$peOffset + 1] -ne 0x45) { throw "Invalid PE signature in $($component.FullName)" }
+
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          $magic = [BitConverter]::ToUInt16($bytes, $peOffset + 24)
+          if ($machine -ne 0x14C) { throw ("Expected x86 machine type 0x14C, got 0x{0:X}" -f $machine) }
+          if ($magic -ne 0x10B) { throw ("Expected PE32 optional header 0x10B, got 0x{0:X}" -f $magic) }
+
+          $componentPath = $component.FullName -replace '\\','/'
+          "component_path=$componentPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Stage Linux build artifacts
+        if: runner.os == 'Linux'
         run: |
           mkdir -p dist/linux/components dist/linux/pawno/include
-          cp "${{ steps.locate_component.outputs.component_path }}" dist/linux/components/
+          cp "${{ steps.locate_linux_component.outputs.component_path }}" dist/linux/components/
           cp Server/include/colandreas.inc dist/linux/pawno/include/colandreas.inc
 
-      - name: Upload Linux build artifacts
+      - name: Stage Windows build artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/windows/components | Out-Null
+          New-Item -ItemType Directory -Force -Path dist/windows/pawno/include | Out-Null
+          Copy-Item "${{ steps.locate_windows_component.outputs.component_path }}" "dist/windows/components/ColAndreas.dll"
+          Copy-Item "Server/include/colandreas.inc" "dist/windows/pawno/include/colandreas.inc"
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-linux
+          name: build-${{ matrix.id }}
           path: |
-            dist/linux/components/*
-            dist/linux/pawno/include/colandreas.inc
+            dist/${{ matrix.id }}/components/*
+            dist/${{ matrix.id }}/pawno/include/colandreas.inc
           if-no-files-found: error
 
       - name: Package Linux release archive
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' && runner.os == 'Linux'
         run: |
           mkdir -p release/ColAndreas
           cp -r dist/linux/components release/ColAndreas/components
           cp -r dist/linux/pawno release/ColAndreas/pawno
           tar -C release -czf dist/ColAndreas-linux.tar.gz ColAndreas
 
+      - name: Verify Linux package contents
+        if: github.event_name == 'release' && runner.os == 'Linux'
+        run: |
+          tar -tzf dist/ColAndreas-linux.tar.gz | grep -E '^ColAndreas/components/ColAndreas(_static)?\.so$'
+          tar -tzf dist/ColAndreas-linux.tar.gz | grep -E '^ColAndreas/pawno/include/colandreas\.inc$'
+
+      - name: Package Windows release archive
+        if: github.event_name == 'release' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Remove-Item -Recurse -Force "release/ColAndreas" -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "dist/windows" "release/ColAndreas"
+          Compress-Archive -Path "release/ColAndreas" -DestinationPath "dist/ColAndreas-windows.zip" -Force
+
+      - name: Verify Windows package contents
+        if: github.event_name == 'release' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $pkg = "dist/ColAndreas-windows.zip"
+          if (!(Test-Path $pkg)) { throw "No ZIP package found: $pkg" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($pkg)
+          try {
+            $entries = $zip.Entries | ForEach-Object { $_.FullName }
+            if (-not ($entries | Where-Object { $_ -eq "ColAndreas/components/ColAndreas.dll" })) {
+              throw "Missing ColAndreas/components/ColAndreas.dll in package"
+            }
+            if (-not ($entries | Where-Object { $_ -eq "ColAndreas/pawno/include/colandreas.inc" })) {
+              throw "Missing ColAndreas/pawno/include/colandreas.inc in package"
+            }
+          } finally {
+            $zip.Dispose()
+          }
+
       - name: Upload release package artifact
         if: github.event_name == 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: release-linux
-          path: dist/ColAndreas-linux.tar.gz
+          name: release-${{ matrix.id }}
+          path: ${{ matrix.release_glob }}
           if-no-files-found: error
 
   upload-release-assets:
     name: Upload release assets
     if: github.event_name == 'release'
-    runs-on: ubuntu-22.04
-    needs: build-linux
+    runs-on: ubuntu-24.04
+    needs: build
     permissions:
       contents: write
 
@@ -92,8 +217,9 @@ jobs:
       - name: Download packaged artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-linux
+          pattern: release-*
           path: release-assets
+          merge-multiple: true
 
       - name: Upload assets to GitHub release
         uses: softprops/action-gh-release@v2
