@@ -7,22 +7,22 @@
             "name": "ColAndreas-linux-static.tar.gz",
             "platform": "linux",
             "archive": true,
-            "includes": ["pawno/include"],
-            "plugins": ["components/ColAndreas_static.so"]
+            "includes": ["ColAndreas/pawno/include"],
+            "plugins": ["ColAndreas/components/ColAndreas_static.so"]
         },
         {
             "name": "ColAndreas-linux.tar.gz",
             "platform": "linux",
             "archive": true,
-            "includes": ["pawno/include"],
-            "plugins": ["components/ColAndreas.so"]
+            "includes": ["ColAndreas/pawno/include"],
+            "plugins": ["ColAndreas/components/ColAndreas.so"]
         },
         {
             "name": "ColAndreas-windows.zip",
             "platform": "windows",
             "archive": true,
-            "includes": ["pawno/include"],
-            "plugins": ["components/ColAndreas.dll"]
+            "includes": ["ColAndreas/pawno/include"],
+            "plugins": ["ColAndreas/components/ColAndreas.dll"]
         }
     ],
     "runtime": {
