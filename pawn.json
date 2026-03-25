@@ -1,5 +1,5 @@
 {
-    "user": "Pottus",
+    "user": "San-Andreas-Online",
     "repo": "ColAndreas",
     "include_path": "Server/include",
     "resources": [
@@ -23,6 +23,6 @@
         }
     ],
     "runtime": {
-        "plugins": ["Pottus/ColAndreas"]
+        "plugins": ["San-Andreas-Online/ColAndreas"]
     }
 }

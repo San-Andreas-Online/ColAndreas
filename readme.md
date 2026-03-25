@@ -1,15 +1,15 @@
 # ColAndreas Component for open.mp
 
-[![Build and Release](https://github.com/Knogle/ColAndreas/actions/workflows/ci.yml/badge.svg)](https://github.com/Knogle/ColAndreas/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/Knogle/ColAndreas?display_name=tag)](https://github.com/Knogle/ColAndreas/releases)
-[![Total Downloads](https://img.shields.io/github/downloads/Knogle/ColAndreas/total.svg)](https://github.com/Knogle/ColAndreas/releases)
-[![Latest Release Downloads](https://img.shields.io/github/downloads/Knogle/ColAndreas/latest/total.svg)](https://github.com/Knogle/ColAndreas/releases)
+[![Build and Release](https://github.com/San-Andreas-Online/ColAndreas/actions/workflows/ci.yml/badge.svg)](https://github.com/San-Andreas-Online/ColAndreas/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/San-Andreas-Online/ColAndreas?display_name=tag)](https://github.com/San-Andreas-Online/ColAndreas/releases)
+[![Total Downloads](https://img.shields.io/github/downloads/San-Andreas-Online/ColAndreas/total.svg)](https://github.com/San-Andreas-Online/ColAndreas/releases)
+[![Latest Release Downloads](https://img.shields.io/github/downloads/San-Andreas-Online/ColAndreas/latest/total.svg)](https://github.com/San-Andreas-Online/ColAndreas/releases)
 
 ColAndreas is an open.mp component that provides server-side collision and world queries for San Andreas using the Bullet Physics library.
 
-Current version: **v1.5.0**
+Current version: **v1.5.0-omp**
 
-Current maintainer: **[Knogle](https://github.com/Knogle)**
+Current maintainer: **[San-Andreas-Online](https://github.com/San-Andreas-Online)**
 
 ## Highlights
 
@@ -20,7 +20,7 @@ Current maintainer: **[Knogle](https://github.com/Knogle)**
 
 ## Download and Installation
 
-1. Download the latest archive from the [Releases page](https://github.com/Knogle/ColAndreas/releases).
+1. Download the latest archive from the [Releases page](https://github.com/San-Andreas-Online/ColAndreas/releases).
 2. Extract the release into your open.mp server root while keeping folder structure.
 3. Ensure at least these files are placed correctly:
    - `components/ColAndreas.so` (Linux shared package includes required `libBullet*.so` / `libLinearMath.so` files)
@@ -45,7 +45,7 @@ You can either:
 ### Repository Setup
 
 ```bash
-git clone https://github.com/Knogle/ColAndreas.git
+git clone https://github.com/San-Andreas-Online/ColAndreas.git
 cd ColAndreas
 git submodule update --init --recursive
 ```

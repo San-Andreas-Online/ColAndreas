@@ -23,7 +23,7 @@ else()
 	message(FATAL_ERROR "open.mp SDK submodule not found. Run: git submodule update --init --recursive")
 endif()
 
-set(CA_VERSION "v1.5.0")
+set(CA_VERSION "v1.5.0-omp")
 set(CA_DATABASE_VERSION 2)
 add_definitions(-DCA_VERSION="${CA_VERSION}" -DCA_DATABASE_VERSION=${CA_DATABASE_VERSION})
 
